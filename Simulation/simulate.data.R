@@ -7,7 +7,7 @@ library(ggpubr)
 library(ggsci)
 
 setwd("C:/Users/eminu/OneDrive/Desktop/Treatment-Effect-Risk")
-
+source("./Simulation/helperfunctions.R")
 
 # create plots illustrating our bounds. Assumption: Y_1, Y_0 jointly Gaussian.
 set.seed(42)
@@ -18,7 +18,7 @@ mu.0 = 0
 sd.1 = 1
 sd.0 = 1
 
-rho = -1
+rho = 0
 
 y.1 = rnorm(n = n.sample, mean = mu.1, sd = sd.1)
 y.0 = rnorm(n = n.sample, mean = mu.0, sd = sd.0)
@@ -32,7 +32,7 @@ results = matrix(data = NA, nrow = length(alpha), ncol = 3)
 
 i = 1
 for(j in alpha){
-  results[i,1] = min(ES(y.1, p_loss = j)-ES(y.0, p_loss = j),
+  results[i,1] = max(ES(y.1, p_loss = j)-ES(y.0, p_loss = j),
                      ES(y.0, p_loss = j)-ES(y.1, p_loss = j))
   results[i,2] = ES(delta, p_loss = j)
   results[i,3] = ES(y.1, p_loss = j) + ES(-1*y.0, p_loss = j)
@@ -56,9 +56,9 @@ plot.bounds = ggplot(data = results.df, aes(x = alpha, y = value, group = name,
   scale_color_jama() +
   theme(legend.position = "top") +
   labs(color = "", group = "", x = expression(alpha),
-       y = expression(CVaR[alpha](delta)))
+       y = expression(widehat(CVaR[alpha](delta))))
 plot.bounds
-ggsave("./Plots/bounds_neg_corr.png", plot.bounds, width = 15, height = 15, units = "cm")
+ggsave("./Plots/bounds_no_corr.png", plot.bounds, width = 15, height = 15, units = "cm")
 
 
 
