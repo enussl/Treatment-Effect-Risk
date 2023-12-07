@@ -291,3 +291,97 @@ plot.kallus.sigma.shift = ggplot(data = sigma.shift.df %>% filter(sigma <= 1),
 plot.kallus.sigma.shift
 ggsave("./Plots/kallus_pos_corr_shift.png", plot.kallus.sigma.shift, width = 15, height = 15, units = "cm")
 
+
+
+# until now, we have not really varied Var(delta \mid X) but the variance of the marginals. Let us
+# do that as it makes most sense. Let Y_1 and Y_0 have equal variance.
+x = seq(1,500,1)
+corr = seq(-1, 1, l = 20)
+sd = seq(0, 2, l = 20)
+
+
+n.sample = 1000
+mu.1 = 1
+mu.0 = 1
+p.shift = 1
+
+alpha = 0.05
+
+results.sigma.shift = matrix(data = NA, nrow = length(sd)*length(corr), ncol = 6)
+
+v = 1
+for (c in corr){
+  for(k in sd){
+    
+    tau.vec = numeric()
+    cdte.mat = matrix(data = NA, nrow = length(x), ncol = 3)
+    
+    i = 1
+    for (j in 1:length(x)){
+      
+      shift.1 = runif(n = 1, 0, p.shift)
+      shift.0 = runif(n = 1, 0, p.shift)
+      y.1 = rnorm(n = n.sample, mean = mu.1+shift.1, sd = k)
+      y.0 = rnorm(n = n.sample, mean = mu.0+shift.0, sd = k)
+      
+      delta = rnorm(n = n.sample, mean = mu.1+shift.1-(mu.0+shift.0),
+                    sd = sqrt(k^2+k^2-2*c*k*k))
+      
+      tau.vec[j] = mean(y.1)-mean(y.0)
+      
+      cdte.mat[i,1] = max(ES(y.1, p_loss = alpha)-ES(y.0, p_loss = alpha),
+                          ES(y.0, p_loss = alpha)-ES(y.1, p_loss = alpha))
+      cdte.mat[i,2] = ES(delta, p_loss = alpha)
+      cdte.mat[i,3] = ES(y.1, p_loss = alpha) + ES(-1*y.0, p_loss = alpha)
+      i = i + 1
+    }
+    
+    cvar.kall = ES(tau.vec, p_loss = alpha)
+    cvar.us = colMeans(cdte.mat)
+    
+    results.sigma.shift[v,1] = cvar.us[1]
+    results.sigma.shift[v,2] = cvar.us[2]
+    results.sigma.shift[v,3] = cvar.us[3]
+    results.sigma.shift[v,4] = cvar.kall
+    results.sigma.shift[v,5] = c
+    results.sigma.shift[v,6] = k
+    v = v + 1
+  }
+}
+
+
+sigma.shift.df = data.frame(results.sigma.shift) %>%
+  rename("LB" = "X1",
+         "True" = "X2",
+         "UB" = "X3",
+         "Kallus" = "X4",
+         "Corr" = "X5",
+         "Se" = "X6") %>%
+  mutate(var.delta.x = 2*Se^2-2*Corr*Se^2,
+         var.delta.x.group = cut(var.delta.x, breaks = 30,
+                                 labels = F),
+         var.delta.x.group = var.delta.x.group/2-0.5) %>%
+  group_by(var.delta.x.group) %>%
+  summarise(LB = mean(LB),
+            True = mean(True),
+            UB = mean(UB),
+            Kallus = mean(Kallus)) %>%
+  pivot_longer(cols = c("LB", "True", "UB", "Kallus")) %>%
+  arrange(name, value)
+
+
+text.corr = c("max(corr), min(var)", "min(corr), max(var)")
+plot.kallus.sigma.shift = ggplot(data = sigma.shift.df,
+                                 aes(x = var.delta.x.group, y = value, group = name, color = name)) +
+  geom_line(alpha = 0.6, linewidth = 0.5) +
+  geom_point(size = 1.5) +
+  theme_bw() +
+  scale_color_jama() +
+  theme(legend.position = "top") +
+  labs(color = "", group = "", x = expression(max(rho) ~ and ~ min(sigma) ~ symbol('\254') ~ Var(delta) ~ given ~ X ~ symbol('\256') ~ min(rho) ~ and ~ max(sigma)),
+       y = expression(widehat(CVaR[alpha](delta))))
+plot.kallus.sigma.shift
+ggsave("./Plots/kallus_full_picture.png", plot.kallus.sigma.shift, width = 20, height = 15, units = "cm")
+
+
+
