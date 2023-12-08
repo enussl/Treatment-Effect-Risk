@@ -1,8 +1,12 @@
 rm(list = ls())
 
 library(dplyr)
+library(tidyr)
 library(cvar)
 library(ggplot2)
+library(ggsci)
+library(gganimate)
+
 
 setwd("C:/Users/eminu/OneDrive/Desktop/Treatment-Effect-Risk")
 
@@ -17,6 +21,8 @@ simulate.full.data = function(shift, sigma.1, sigma.0,
   # mu.1: mean Y_1
   # mu.0: mean Y_0
   # alpha: alpha of CVaR
+  
+  set.seed(42)
   
   max.var = sigma.1^2+sigma.0^2+2*sigma.1*sigma.0
   x = seq(1,1000,1)
@@ -94,7 +100,99 @@ simulate.full.data = function(shift, sigma.1, sigma.0,
 
 
 
-plot.results = function(df){
+simulate.corr.static = function(shift, sigma.1, sigma.0,
+                         n.obs, mu.1, mu.0,
+                         rho){
+  
+  # shift: upper limit of uniform r.v. (controls mean shifts)
+  # sigma.1: std of Y_1
+  # sigma.0: std of Y_0
+  # n.obs: number of observations
+  # mu.1: mean Y_1
+  # mu.0: mean Y_0
+  # rho: correlation pot. outcomes
+  
+  
+  set.seed(42)
+  n.sample = n.obs
+  
+  y.1 = rnorm(n = n.sample, mean = mu.1, sd = sigma.1)
+  y.0 = rnorm(n = n.sample, mean = mu.0, sd = sigma.0)
+  
+  delta = rnorm(n = n.sample, mean = mu.1-mu.0,
+                sd = sqrt(sigma.1^2+sigma.0^2-2*rho*sigma.1*sigma.0))
+  
+  alpha = seq(0, 1, 0.05)
+  
+  results = matrix(data = NA, nrow = length(alpha), ncol = 3)
+  
+  i = 1
+  for(j in alpha){
+    results[i,1] = max(ES(y.1, p_loss = j)-ES(y.0, p_loss = j),
+                       ES(y.0, p_loss = j)-ES(y.1, p_loss = j))
+    results[i,2] = ES(delta, p_loss = j)
+    results[i,3] = ES(y.1, p_loss = j) + ES(-1*y.0, p_loss = j)
+    i = i + 1
+  }
+  
+  
+  results.df = data.frame(results) %>%
+    rename("LB" = "X1",
+           "True" = "X2",
+           "UB" = "X3") %>%
+    mutate(alpha = alpha) %>%
+    pivot_longer(cols = c("LB", "True", "UB"))
+  
+  return(results.df)
+}
+
+
+simulate.corr.dynamic = function(shift, sigma.1, sigma.0,
+                                 n.obs, mu.1, mu.0){
+  
+  set.seed(42)
+  n.sample = n.obs
+  
+  corr = seq(-1, 1, l = 20)
+  results.corr = list()
+  
+  v = 1
+  for (c in corr){
+    
+    y.1 = rnorm(n = n.sample, mean = mu.1, sd = sigma.1)
+    y.0 = rnorm(n = n.sample, mean = mu.0, sd = sigma.0)
+    
+    delta = rnorm(n = n.sample, mean = mu.1-mu.0,
+                  sd = sqrt(sigma.1^2+sigma.0^2-2*c*sigma.1*sigma.0))
+    
+    alpha = seq(0, 1, 0.05)
+    results = matrix(data = NA, nrow = length(alpha), ncol = 4)
+    
+    i = 1
+    for(j in alpha){
+      results[i,1] = max(ES(y.1, p_loss = j)-ES(y.0, p_loss = j),
+                         ES(y.0, p_loss = j)-ES(y.1, p_loss = j))
+      results[i,2] = ES(delta, p_loss = j)
+      results[i,3] = ES(y.1, p_loss = j) + ES(-1*y.0, p_loss = j)
+      results[i,4] = j
+      i = i + 1
+    }
+    
+    results.corr[[v]] = data.frame(results) %>%
+      mutate(corr = c)
+    v = v + 1
+  }
+  
+  results = do.call(rbind, results.corr) %>%
+    rename("LB" = "X1", "True" = "X2", "UB" = "X3", "alpha" = "X4") %>%
+    pivot_longer(cols = c("LB", "True", "UB")) %>%
+    mutate(corr = round(corr, 2))
+  return(results)
+}
+
+
+
+plot.results.full = function(df){
   
   # df: data set of results
   
@@ -111,7 +209,47 @@ plot.results = function(df){
 }
 
 
-data = simulate.full.data(shift = 0.1, sigma.1 = 2, sigma.0 = 2, n.obs = 1000, mu.1 = 1, mu.0 = 1, alpha = 0.05)
-(plot = plot.results(data))
+plot.results.corr.static = function(df){
+  
+  # df: data set of results from static
+  
+  plot = ggplot(data = df, aes(x = alpha, y = value, group = name,
+                                              color = name)) +
+    geom_line(alpha = 0.6, position = position_jitter(width = 0.01, height = 0.01, seed = 1)) +
+    geom_point(position = position_jitter(width = 0.01, height = 0.01, seed = 1)) +
+    theme_bw() +
+    scale_color_jama() +
+    theme(legend.position = "top") +
+    labs(color = "", group = "", x = expression(alpha),
+         y = expression(widehat(CVaR[alpha](delta))))
+  return(plot)
+}
 
 
+plot.results.corr.dynamic = function(df){
+  
+  # df: data set of results from dynamic
+  
+  plot = ggplot(data = df, aes(x = alpha, y = value, group = name,
+                                 color = name)) +
+    geom_line(alpha = 0.6, position = position_jitter(width = 0.01, height = 0.01, seed = 1)) +
+    geom_point(position = position_jitter(width = 0.01, height = 0.01, seed = 1)) +
+    theme_bw() +
+    scale_color_jama() +
+    theme(legend.position = "top") +
+    labs(color = "", group = "", x = expression(alpha),
+         y = expression(widehat(CVaR[alpha](delta)))) +
+    facet_wrap(~corr)
+  return(plot)
+}
+
+
+data = simulate.full.data(shift = 2, sigma.1 = 2, sigma.0 = 2, n.obs = 1000, mu.1 = 1, mu.0 = 1, alpha = 0.05)
+data = simulate.corr.static(shift = 2, sigma.1 = 2, sigma.0 = 2, n.obs = 100000, mu.1 = 1, mu.0 = 1, rho = 0.7)
+data = simulate.corr.dynamic(shift = 2, sigma.1 = 2, sigma.0 = 2, n.obs = 100000, mu.1 = 1, mu.0 = 1)
+
+
+(plot = plot.results.corr.static(data))
+(plot = plot.results.corr.dynamic(data))
+
+ggsave("./Plots/vary_with_corr.png", plot, width = 20, height = 20, units = "cm")
