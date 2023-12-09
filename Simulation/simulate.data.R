@@ -10,7 +10,7 @@ setwd("C:/Users/eminu/OneDrive/Desktop/Treatment-Effect-Risk")
 source("./Simulation/helperfunctions.R")
 
 
-# OLD FILE
+# OLD FILE.CAN DISREGARD.
 
 # create plots illustrating our bounds. Assumption: Y_1, Y_0 jointly Gaussian.
 set.seed(42)
@@ -97,7 +97,7 @@ for (p in sd){
     
     tau.vec[k] = mean(y.1)-mean(y.0)
     
-    cdte.mat[i,1] = min(ES(y.1, p_loss = alpha)-ES(y.0, p_loss = alpha),
+    cdte.mat[i,1] = max(ES(y.1, p_loss = alpha)-ES(y.0, p_loss = alpha),
                         ES(y.0, p_loss = alpha)-ES(y.1, p_loss = alpha))
     cdte.mat[i,2] = ES(delta, p_loss = alpha)
     cdte.mat[i,3] = ES(y.1, p_loss = alpha) + ES(-1*y.0, p_loss = alpha)
@@ -175,7 +175,7 @@ for (p in mu.shift){
     
     tau.vec[k] = mean(y.1)-mean(y.0)
     
-    cdte.mat[i,1] = min(ES(y.1, p_loss = alpha)-ES(y.0, p_loss = alpha),
+    cdte.mat[i,1] = max(ES(y.1, p_loss = alpha)-ES(y.0, p_loss = alpha),
                         ES(y.0, p_loss = alpha)-ES(y.1, p_loss = alpha))
     cdte.mat[i,2] = ES(delta, p_loss = alpha)
     cdte.mat[i,3] = ES(y.1, p_loss = alpha) + ES(-1*y.0, p_loss = alpha)
@@ -252,7 +252,7 @@ for (p in sd){
     
     tau.vec[k] = mean(y.1)-mean(y.0)
     
-    cdte.mat[i,1] = min(ES(y.1, p_loss = alpha)-ES(y.0, p_loss = alpha),
+    cdte.mat[i,1] = max(ES(y.1, p_loss = alpha)-ES(y.0, p_loss = alpha),
                         ES(y.0, p_loss = alpha)-ES(y.1, p_loss = alpha))
     cdte.mat[i,2] = ES(delta, p_loss = alpha)
     cdte.mat[i,3] = ES(y.1, p_loss = alpha) + ES(-1*y.0, p_loss = alpha)
