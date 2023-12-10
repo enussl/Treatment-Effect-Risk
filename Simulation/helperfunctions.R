@@ -6,6 +6,7 @@ library(cvar)
 library(ggplot2)
 library(ggsci)
 library(gganimate)
+library(stats)
 
 
 setwd("C:/Users/eminu/OneDrive/Desktop/Treatment-Effect-Risk")
@@ -25,7 +26,7 @@ simulate.full.data = function(shift, sigma.1, sigma.0,
   set.seed(42)
   
   max.var = sigma.1^2+sigma.0^2+2*sigma.1*sigma.0
-  x = seq(1,1000,1)
+  x = seq(1,10000,1)
   corr = seq(-1, 1, l = 20)
   sd = list(seq(0, sigma.1, l = 20), seq(0, sigma.0, l = 20))
 
@@ -191,6 +192,53 @@ simulate.corr.dynamic = function(shift, sigma.1, sigma.0,
 }
 
 
+# simulate.corr.dynamic = function(shift, sigma.1, sigma.0,
+#                                  n.obs, mu.1, mu.0){
+#   
+#   set.seed(42)
+#   n.sample = n.obs
+#   
+#   corr = seq(-1, 1, l = 20)
+#   results.corr = list()
+#   
+#   v = 1
+#   for (c in corr){
+#     
+#     y.1 = rnorm(n = n.sample, mean = mu.1, sd = sigma.1)
+#     y.0 = rnorm(n = n.sample, mean = mu.0, sd = sigma.0)
+#     
+#     delta.conv = stats::convolve(x = y.1, y = rev(y.0))
+#     
+#     delta = rnorm(n = n.sample, mean = mu.1-mu.0,
+#                   sd = sqrt(sigma.1^2+sigma.0^2-2*c*sigma.1*sigma.0))
+#     
+#     alpha = seq(0, 1, 0.05)
+#     results = matrix(data = NA, nrow = length(alpha), ncol = 5)
+#     
+#     i = 1
+#     for(j in alpha){
+#       results[i,1] = max(ES(y.1, p_loss = j)-ES(y.0, p_loss = j),
+#                          ES(-1*y.0, p_loss = j)-ES(-1*y.1, p_loss = j))
+#       results[i,2] = ES(delta, p_loss = j)
+#       results[i,3] = ES(y.1, p_loss = j) + ES(-1*y.0, p_loss = j)
+#       results[i,4] = ES(delta.conv, p_loss = j)
+#       results[i,5] = j
+#       i = i + 1
+#     }
+#     
+#     results.corr[[v]] = data.frame(results) %>%
+#       mutate(corr = c)
+#     v = v + 1
+#   }
+#   
+#   results = do.call(rbind, results.corr) %>%
+#     rename("LB" = "X1", "True" = "X2", "UB" = "X3", "Ind" = "X4" ,"alpha" = "X5") %>%
+#     pivot_longer(cols = c("LB", "True", "UB", "Ind")) %>%
+#     mutate(corr = round(corr, 2))
+#   return(results)
+# }
+
+
 simulate.corr.full = function(shift, sigma.1, sigma.0,
                               n.obs, mu.1, mu.0, alpha){
   
@@ -203,7 +251,7 @@ simulate.corr.full = function(shift, sigma.1, sigma.0,
   # alpha: alpha of CVaR
   
   set.seed(42)
-  x = seq(1,1000,1)
+  x = seq(1,10000,1)
   n.sample = n.obs
   
   corr = seq(-1, 1, l = 20)
@@ -379,7 +427,7 @@ plot.results.corr.dynamic = function(df){
     geom_line(alpha = 0.6, position = position_jitter(width = 0.01, height = 0.01, seed = 1)) +
     geom_point(position = position_jitter(width = 0.01, height = 0.01, seed = 1)) +
     theme_bw() +
-    scale_color_manual(values = pal_jama("default")(4)[c(2,3,4)]) +
+    scale_color_manual(values = pal_jama("default")(4)[c(1,2,3,4)]) +
     theme(legend.position = "top") +
     labs(color = "", group = "", x = expression(alpha),
          y = expression(widehat(CVaR[alpha](delta)))) +
