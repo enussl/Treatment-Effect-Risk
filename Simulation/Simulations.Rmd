@@ -1,0 +1,473 @@
+---
+title: "Simulations"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+library(cvar)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(ggsci)
+library(ggpubr)
+
+```
+
+For Gaussian distributions the conditional value at risk can be computed explicitly with the formula: 
+\begin{align*}
+  CVaR(X) 
+  = \mu + \frac {\varphi(\Phi^{-1}(\alpha))}{1-\alpha}\sigma
+\end{align*}
+
+where $\Phi$ is the distribution function and $\varphi$ the density of the standard normal distribution. The R-code below implements this function: 
+
+```{r}
+
+CVaR.gaussian <- function(mu, sd, alpha) {
+  if (alpha == 1) return(mu)
+  q <- qnorm(1-alpha)
+  mu + dnorm(q) / (alpha) * sd
+}
+
+```
+
+We then validate the functions output by comparing it to computing the CVaR on simulated data: 
+
+```{r}
+
+mu <- 3
+sd <- 4
+
+```
+
+```{r, fig.height=4}
+
+n <- 1000000
+delta <- rnorm(n, mean = mu, sd = sd)
+hist(delta, freq = FALSE, breaks = 100)
+
+```
+```{r}
+
+alpha <- 0.05
+
+ES(-delta, p_loss = alpha)
+CVaR.gaussian(mu, sd, alpha)
+
+#mu + sd * ES(qnorm, dist.type = "qf", p_loss = alpha)
+
+```
+
+As can be seen above, both methods produce comparable outputs. We may therefore continue with a more theoretical analysis of the CVaR of Gaussian random variables. 
+
+Let $\delta = Y_1 - Y_0$ be the individual treatment effect (ITE) where $Y_{0} = f_0(X) + \varepsilon_{0}$ and $Y_{1} = f_1(X) + \varepsilon_{1}$ and the noise terms have the following structure: 
+\begin{align*}
+  \boldsymbol{\varepsilon}
+  =
+  \begin{pmatrix}
+    \varepsilon_0 \\
+    \varepsilon_1
+  \end{pmatrix} 
+  \sim \mathcal N \left(
+  \begin{pmatrix}
+    0 \\
+    0
+  \end{pmatrix}
+  , 
+  \begin{pmatrix}
+    \sigma_0^2 & \rho \sigma_0 \sigma_1\\
+    \rho \sigma_0 \sigma_1 & \sigma_1^2
+  \end{pmatrix}\right)
+\end{align*}
+
+For convenience and to obtain closed form solutions, we assume a linear $f$ in the following, i.e., $f_i(X) = \alpha_i + \beta_i X$. We can then explicitly model the distribution of the ITE $\delta$, the conditional distributional treatment effect (CDTE) $\delta|X = Y_1 - Y_0 |X$ and the conditional average treatment effect (CATE) $\tau(X) = \mathbb E [Y_1 - Y_0 |X]$. 
+
+Let's assume that $X \sim \mathcal N (\mu_X, \sigma_X^2)$ and independent of $\boldsymbol{\varepsilon}$. Then the ITE is a linear combination of Gaussians and therefore itself has a Gaussian distribution with the following mean and variance: 
+\begin{align*}
+  \delta 
+  &= Y_1 - Y_0 \\
+  &= f_1(X) + \varepsilon_1 - (f_0(X) + \varepsilon_0) \\
+  &= \alpha_1 + \beta_1 X + \varepsilon_1 - (\alpha_0 + \beta_0 X + \varepsilon_0) \\
+  &= \alpha_1 + \beta_1 X + \varepsilon_1 - \alpha_0 - \beta_0 X - \varepsilon_0 \\
+  &= \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) X + \varepsilon_1 - \varepsilon_0 \\\\
+  \mathbb E[\delta] 
+  &= \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) \mu_X \\\\
+  Var(\delta)
+  &= Var((\beta_1 - \beta_0) X + \varepsilon_1 - \varepsilon_0) \\
+  &= Var((\beta_1 - \beta_0) X) + Var(\varepsilon_1 - \varepsilon_0) \\
+  &= (\beta_1 - \beta_0)^2 \sigma_X^2 + Var(\varepsilon_1) + Var(\varepsilon_0) - 2Cov(\varepsilon_1, \varepsilon_0) \\
+  &= (\beta_1 - \beta_0)^2 \sigma_X^2 + \sigma_1^2 + \sigma_0^2 - 2\rho \sigma_0 \sigma_1
+\end{align*}
+
+Thus, we know that the ITE is distributed according to the Gaussian distribution below: 
+\begin{align*}
+  \delta 
+  \sim \mathcal N(\alpha_1 - \alpha_0 + (\beta_1 - \beta_0) \mu_X, (\beta_1 - \beta_0)^2 \sigma_X^2 + \sigma_1^2 + \sigma_0^2 - 2\rho \sigma_0 \sigma_1)
+\end{align*}
+
+Further, the mean and variance of the CATE are: 
+\begin{align*}
+  \tau(X)
+  &= \mathbb E[Y_1 - Y_0|X] 
+  = \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) X \\
+  \mathbb E[\tau(X)] 
+  &= \mathbb E[\mathbb E[Y_1 - Y_0|X]]
+  = \mathbb E[Y_1 - Y_0]
+  = \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) \mu_X \\
+  Var(\tau(X)) 
+  &= Var((\beta_1 - \beta_0) X)
+  = (\beta_1 - \beta_0)^2 \sigma_X^2
+\end{align*}
+
+We therefore obtain that it is distributed as: 
+\begin{align*}
+  \tau(X) 
+  \sim \mathcal N(\alpha_1 - \alpha_0 + (\beta_1 - \beta_0)\mu_X, (\beta_1 - \beta_0)^2\sigma_X^2)
+\end{align*}
+
+From which we directly see that it is an unbiased estimate of the ITE. Additionally, we can see that only the variance in $X$ remains, which means that the distribution is more concentrated and therefore its CVaR is less extreme. 
+
+Similarly, we can derive the mean and variance and subsequently also the distribution of the CDTE: 
+\begin{align*}
+  \delta |X
+  &= Y_1 - Y_0 | X
+  = \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) X + \varepsilon_1 - \varepsilon_0 \\
+  \mathbb E[\delta|X] 
+  &= \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) X \\
+  Var(\delta|X) 
+  &= Var(\varepsilon_1 - \varepsilon_0) 
+  = \sigma_1^2 + \sigma_0^2 - 2\rho \sigma_0 \sigma_1
+\end{align*}
+
+To ensure that this result is correct, we also compute it via the formula for conditioning in multivariate Gaussian distributions. For this we frist compute the covariance between $\delta$ and $X$: 
+\begin{align*}
+  Cov(\delta, X)
+  &= Cov(\alpha_1 - \alpha_0 + (\beta_1 - \beta_0) X + \varepsilon_1 - \varepsilon_0, X) \\
+  &= Cov((\beta_1 - \beta_0) X + \varepsilon_1 - \varepsilon_0, X) \\
+  &= Cov((\beta_1 - \beta_0) X,X) + Cov(\varepsilon_1, X) - Cov(\varepsilon_0, X) \\
+  &= (\beta_1 - \beta_0) \sigma_X^2
+\end{align*}
+
+Given the covariance structure, we then have that the joint distribution of $\delta$ and $X$ is: 
+\begin{align*}
+  \begin{pmatrix}
+    \delta \\
+    X
+  \end{pmatrix} 
+  \sim \mathcal N \left(
+  \begin{pmatrix}
+    \mu_\delta \\
+    \mu_X
+  \end{pmatrix}
+  , 
+  \begin{pmatrix}
+    \sigma_\delta^2 & (\beta_1 - \beta_0) \sigma_X^2 \\
+    (\beta_1 - \beta_0) \sigma_X^2 & \sigma_X^2
+  \end{pmatrix}\right)
+\end{align*}
+
+where $\mu_\delta = \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) \mu_X$ and $\sigma_\delta = (\beta_1 - \beta_0)^2 \sigma_X^2 + \sigma_1^2 + \sigma_0^2 - 2\rho \sigma_0 \sigma_1$. The distribution of $\delta|X$ can then be derived using the expression for mean and variance of conditional gaussian distributions: 
+\begin{align*}
+  \mu_{\delta|X} 
+  &= \mu_\delta + \Sigma_{\delta X} \Sigma^{-1}_{XX}(X - \mu_X) \\
+  &= \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) \mu_X + (\beta_1 - \beta_0) \sigma_X^2 / \sigma_X^2 (X - \mu_X) \\
+  &= \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) \mu_X + (\beta_1 - \beta_0) (X - \mu_X) \\
+  &= \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) X \\\\
+  \Sigma_{\delta|X}
+  &= \Sigma_{\delta\delta} - \Sigma_{\delta X} \Sigma^{-1}_{XX} \Sigma_{X \delta} \\
+  &= (\beta_1 - \beta_0)^2 \sigma_X^2 + \sigma_1^2 + \sigma_0^2 - 2\rho \sigma_0 \sigma_1 - (\beta_1 - \beta_0)^2 \sigma_X^4 / \sigma_X^2 \\
+  &= (\beta_1 - \beta_0)^2 \sigma_X^2 + \sigma_1^2 + \sigma_0^2 - 2\rho \sigma_0 \sigma_1 - (\beta_1 - \beta_0)^2 \sigma_X^2 \\
+  &= \sigma_1^2 + \sigma_0^2 - 2\rho \sigma_0 \sigma_1
+\end{align*}
+
+Therefore, using the conditional distribution formula to derive the distribution of $\delta |X$ we obtain the same distribution as with the indirect computation via the laws of conditional mean and variance. Namely, we obtain: 
+\begin{align*}
+  \delta|X 
+  \sim \mathcal N(\alpha_1 - \alpha_0 + (\beta_1 - \beta_0) X, \sigma_1^2 + \sigma_0^2 - 2\rho \sigma_0 \sigma_1)
+\end{align*}
+
+Using the explicit expression for the CVaR of a Gaussian distribution we obtain $CVaR(\delta|X)$ as: 
+\begin{align*}
+  CVaR(\delta|X) 
+  &= \mu_{\delta|X} + \frac {\varphi(\Phi^{-1}(\alpha))}{1-\alpha}\sqrt{\Sigma_{\delta|X}} \\
+  &= \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) X + \frac {\varphi(\Phi^{-1}(\alpha))}{1-\alpha}\sqrt{\sigma_1^2 + \sigma_0^2 - 2\rho \sigma_0 \sigma_1}
+\end{align*}
+
+Since $CVaR(\delta|X)$ is still random in $X$, we take an expectation: 
+\begin{align*}
+  \mathbb E[CVaR(\delta|X)]
+  &= \mathbb E[\alpha_1 - \alpha_0 + (\beta_1 - \beta_0) X + \frac {\varphi(\Phi^{-1}(\alpha))}{1-\alpha}\sqrt{\sigma_1^2 + \sigma_0^2 - 2\rho \sigma_0 \sigma_1}] \\
+  &= \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) \mu_X + \frac {\varphi(\Phi^{-1}(\alpha))}{1-\alpha}\sqrt{\sigma_1^2 + \sigma_0^2 - 2\rho \sigma_0 \sigma_1}
+\end{align*}
+
+Analogously, we can explicitly state Kallus' bound on the $CVaR(\delta)$, i.e., the CVaR of the CATE: 
+\begin{align*}
+  CVaR(\tau(X)) 
+  &= \mu_{\tau(X)} + \frac {\varphi(\Phi^{-1}(\alpha))}{1-\alpha}\sigma_{\tau(X)} \\
+  &= \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) \mu_X + \frac {\varphi(\Phi^{-1}(\alpha))}{1-\alpha}((\beta_1 - \beta_0)\sigma_X)
+\end{align*}
+
+Here, we can clearly see that both bounds for the CVaR have the same term for the mean and only differ in how they deviate from this term. $\mathbb E[CVaR(\delta|X)]$ incorporates the variability of the noise $\boldsymbol \varepsilon$ and therefore also its correlation structure. Kallus' $CVaR(\tau(X))$, in turn, incorporates the variance of the covariates but does not consider the variability in the noise.  
+
+\textbf{Remark}: Note that due to incorporating the different variabilities into the bound results in the bounds being tight in different scenarios, i.e., in exactly the cases when the variability that is not incorporated is 0. Furthermore, this means that we can interpolate between the bounds by going from one regime of variability to the other one. 
+
+So far, the main advantage of Kallus' bound is that it only relies on observable quanitities. For this reason, we sandwich the bound $\mathbb E[CVaR(\delta|X)]$ as follows: 
+\begin{align*}
+  \max\{\mathbb E[CVaR(Y_1|X) &- CVaR(Y_0|X)], \mathbb E[CVaR(-Y_0|X) - CVaR(-Y_1|X)]\} \\
+  &\leq \mathbb E[CVaR(\delta|X)]
+  \leq \mathbb E[CVaR(Y_1|X)] + \mathbb E[CVaR(-Y_0|X)]
+\end{align*}
+
+For this we additionally also have to derive the distribution, CVaR and expected CVaR of $Y_i|X$ and $-Y_i|X$: 
+\begin{align*}
+  Y_i|X
+  &= f_i(X) + \varepsilon_i
+  = \alpha_i + \beta_i X + \varepsilon_i \\
+  \mathbb E[Y_i|X]
+  &= \mathbb E[\alpha_i + \beta_i X + \varepsilon_i]
+  = \alpha_i + \beta_i X \\
+  Var(Y_i|X) 
+  &= Var(\alpha_i + \beta_i X + \varepsilon_i)
+  = Var(\varepsilon_i)
+  = \sigma_i^2
+\end{align*}
+
+Analogously, we have $\mathbb E[-Y_i|X] = -\alpha_i - \beta_i X$ and $Var(-Y_i|X) = \sigma_i^2$. From this we infer the distributions with their corresponding conditional value at risk: 
+\begin{align*}
+  Y_i|X 
+  \sim \mathcal N(\alpha_i + \beta_i X, \sigma_i^2) \;
+  & \; \Rightarrow \mathbb E[CVaR(Y_i|X)]
+  = \alpha_i + \beta_i \mu_X + \frac {\varphi(\Phi^{-1}(\alpha))}{1-\alpha}\sigma_i \\
+  -Y_i|X 
+  \sim \mathcal N(-\alpha_i - \beta_i X, \sigma_i^2) \;
+  & \; \Rightarrow \mathbb E[CVaR(-Y_i|X)]
+  = -\alpha_i - \beta_i \mu_X + \frac {\varphi(\Phi^{-1}(\alpha))}{1-\alpha}\sigma_i
+\end{align*}
+
+From this we get explicit expressions for the upper and lower bound on 
+
+TODO: keep squaring, then they are the same in the Gaussian case
+
+\begin{align*}
+  \mathbb E[CVaR(Y_1|X) - CVaR(Y_0|X)]
+  = \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) \mu_X + \frac {\varphi(\Phi^{-1}(\alpha))}{1-\alpha}(\sigma_1 - \sigma_0) \\
+  \mathbb E[CVaR(-Y_0|X) - CVaR(-Y_1|X)]
+  = \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) \mu_X + \frac {\varphi(\Phi^{-1}(\alpha))}{1-\alpha}(\sigma_0 - \sigma_1) \\
+  \mathbb E[CVaR(Y_1|X)] + \mathbb E[CVaR(-Y_0|X)]
+  = \alpha_1 - \alpha_0 + (\beta_1 - \beta_0) \mu_X + \frac {\varphi(\Phi^{-1}(\alpha))}{1-\alpha}(\sigma_0 + \sigma_1)
+\end{align*}
+
+where it is worth noticing, that the maximum in the lower bound switches between the scaling factors $(\sigma_1 - \sigma_0)$ and $(\sigma_0 - \sigma_1)$. Moreover, notice that here we can also easily link the tightness of the upper bound and lower bounds to the cases of perfect positive and negative correlation. $\mathbb E[CVaR(\delta|X)]$ and the lower and upper bound have the same mean terms and only differ in the scaling factor. Given this observation, we eximplify the tightness for the upper bound, $\rho = -1$ and thus perfect negative correlation of $Y_1$ and $Y_0$: 
+\begin{align*}
+  \sqrt{\sigma_1^2 + \sigma_0^2 - 2\rho\sigma_0\sigma_1}
+    &\leq (\sigma_0 + \sigma_1) \\
+  \Leftrightarrow \sigma_1^2 + \sigma_0^2 - 2\rho\sigma_0\sigma_1 
+    &\leq (\sigma_0 + \sigma_1)^2 \\
+  \Leftrightarrow \sigma_1^2 + \sigma_0^2 - 2\rho\sigma_0\sigma_1 
+    &\leq \sigma_0^2 + \sigma_1^2 + 2\sigma_0\sigma_1 \\
+  \Leftrightarrow - 2\rho\sigma_0\sigma_1 
+    &\leq 2\sigma_0\sigma_1
+\end{align*}
+
+A similar result can be derived for the lower bound, $\rho = 1$ and perfect positive correlation of $Y_1$ and $Y_0$. 
+
+Given these theoretical results we can now validate the observations we have made based on formulas above. In this regards, let us first note that changing the intercepts of the functions only shifts the bounds and varying them is therefore not really interesting. The most interesting observations can be made when varying the variance of the covariats $\sigma_X^2$ and the difference in slopes $\beta_1 - \beta_0$. 
+
+For this, we first implement the different bounds in R: 
+
+```{r}
+
+rho <- 0 # 1 here means that Y_1 and -Y_0 are perfectly correlated
+
+CVaR.delta <- function(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho) {
+  delta.mu <- a.1-a.0+(b.1-b.0)*mu.X
+  delta.sd <- sqrt((b.1-b.0)^2*sigma.X^2+sigma.1^2+sigma.0^2-2*rho*sigma.0*sigma.1)
+
+  CVaR.gaussian(delta.mu, delta.sd, alpha)
+}
+
+CVaR.delta.X <- function(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho) {
+  delta.X.mu <- a.1-a.0+(b.1-b.0)*mu.X
+  delta.X.sd <- sqrt(sigma.1^2+sigma.0^2-2*rho*sigma.0*sigma.1)
+  
+  CVaR.gaussian(delta.X.mu, delta.X.sd, alpha)
+} # Note that this is the expected CVaR, i.e., E[CVaR(delta|X)]
+
+CVaR.tau <- function(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho) {
+  tau.mu <- a.1 - a.0 + (b.1 - b.0) * mu.X
+  tau.sd <- sqrt((b.1 - b.0)^2 * sigma.X^2) # sqrt(.) and (.)^2 cancel # TODO: Check whether it actually cancels
+  
+  CVaR.gaussian(tau.mu, tau.sd, alpha)
+}
+
+CVaR.lb <- function(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho) {
+  mu <- a.1 - a.0 + (b.1 - b.0) * mu.X
+  sd <- max(sigma.1 - sigma.0, sigma.0 - sigma.1)
+  
+  CVaR.gaussian(mu, sd, alpha)
+} # Note that this is the expected CVaR
+
+CVaR.ub <- function(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho) {
+  mu <- a.1 - a.0 + (b.1 - b.0) * mu.X
+  sd <- sigma.0 + sigma.1
+  
+  CVaR.gaussian(mu, sd, alpha)
+} # Note that this is the expected CVaR
+
+```
+
+Given the functions we can first validate that neither $\mathbb E[CVaR(\delta|X)]$ nor Kallus' bound dominate the other one in the sense that they are always better than the other one. To exemplify this let us vary the variance of the covariates $\sigma_X^2$. This implicitly varies the ratio of the variance in the covariates versus the noise variance. 
+
+```{r}
+
+a.0 <- 0
+a.1 <- 0
+
+b.0 <- 2
+b.1 <- 1
+
+mu.X <- 0
+
+sigma.0 <- 1
+sigma.1 <- 1
+
+sigma.X <- 0.1
+c(
+  "delta" = CVaR.delta(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho),
+  "CATE" = CVaR.tau(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho),
+  "ub" = CVaR.ub(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho),
+  "delta|X" = CVaR.delta.X(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho),
+  "lb" = CVaR.lb(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho)
+)
+
+sigma.X <- 10
+c(
+  "delta" = CVaR.delta(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho),
+  "CATE" = CVaR.tau(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho),
+  "ub" = CVaR.ub(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho),
+  "delta|X" = CVaR.delta.X(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho),
+  "lb" = CVaR.lb(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, rho)
+)
+
+```
+
+We notice that when $\sigma_X^2$ is high, Kallus' bound is closer, whereas when $\sigma_X^2$ is small and therefore the noise variances $\sigma_0^2$ and $\sigma_1^2$ dominate $\mathbb E[CVaR(\delta|X)]$ is closer to $CVar(\delta)$.
+
+The plots below give additional intuition for this phenomenon and the behavior of the bounds on $\mathbb E[CVaR(\delta|X)]$ when varying the ratio of the variabilities or the difference $\beta_1 - \beta_0$: 
+
+```{r}
+
+plot.CVaRs <- function(a.0, a.1, b.0, b.1, mu.X, sigma.X, sigma.0, sigma.1, steps = 20) {
+  
+  rhos <- seq(from = -1, to = 1, length.out = steps)
+  
+  CVaRs <- array(c(
+    sapply(rhos,function(r) CVaR.delta(a.0,a.1,b.0,b.1,mu.X,sigma.X,sigma.0,sigma.1,r)),
+    sapply(rhos,function(r) CVaR.tau(a.0,a.1,b.0,b.1,mu.X,sigma.X,sigma.0,sigma.1,r)),
+    sapply(rhos,function(r) CVaR.lb(a.0,a.1,b.0,b.1,mu.X,sigma.X,sigma.0,sigma.1,r)),
+    sapply(rhos,function(r) CVaR.delta.X(a.0,a.1,b.0,b.1,mu.X,sigma.X,sigma.0,sigma.1,r)),
+    sapply(rhos,function(r) CVaR.ub(a.0,a.1,b.0,b.1,mu.X,sigma.X,sigma.0,sigma.1,r))
+  ), dim = c(steps,5))
+  
+  plot(rhos, CVaRs[,1], type = "l", col = "black", ylim=c(min(CVaRs)-1,max(CVaRs)), ylab = "CVaRs")
+  lines(rhos, CVaRs[,2], type = "l", col = "blue")
+  lines(rhos, CVaRs[,3], type = "l", col = "gold2")
+  lines(rhos, CVaRs[,4], type = "l", col = "olivedrab3")
+  lines(rhos, CVaRs[,5], type = "l", col = "forestgreen")
+  
+}
+
+```
+
+```{r}
+
+sigma.Xs <- c(0,0.1,0.2,0.5,1,2,3,10,100)
+par(mfrow = c(3,3), mar = c(4, 4, 2, 2))
+
+for (sigma.X in sigma.Xs) {
+  plot.CVaRs(a.0=0, a.1=0, b.0=1, b.1=2, mu.X, sigma.X, sigma.0, sigma.1)
+}
+
+```
+
+```{r}
+
+b.diffs <- c(0.5,1,2,3,4,8,16,32,64)
+par(mfrow = c(3,3), mar = c(4, 4, 2, 2))
+
+for (b.diff in b.diffs) {
+  plot.CVaRs(a.0=0, a.1=0, b.0=1, b.1=b.diff, mu.X, 0.1, sigma.0, sigma.1)
+}
+
+```
+
+
+```{r}
+create.results = function(a.0,a.1,b.0,b.1,mu.X,sigma.X,sigma.0,sigma.1){
+  
+  rhos <- seq(from = -1, to = 1, length.out = 30)
+  CVaRs <- array(c(
+    sapply(rhos,function(r) CVaR.delta(a.0,a.1,b.0,b.1,mu.X,sigma.X,sigma.0,sigma.1,r)),
+    sapply(rhos,function(r) CVaR.tau(a.0,a.1,b.0,b.1,mu.X,sigma.X,sigma.0,sigma.1,r)),
+    sapply(rhos,function(r) CVaR.lb(a.0,a.1,b.0,b.1,mu.X,sigma.X,sigma.0,sigma.1,r)),
+    sapply(rhos,function(r) CVaR.delta.X(a.0,a.1,b.0,b.1,mu.X,sigma.X,sigma.0,sigma.1,r)),
+    sapply(rhos,function(r) CVaR.ub(a.0,a.1,b.0,b.1,mu.X,sigma.X,sigma.0,sigma.1,r))
+  ), dim = c(30,5))
+  CVaRs.df = data.frame(CVaRs) %>%
+    mutate(corr = rhos) %>%
+    rename("ITE" = "X1", "CATE" = "X2", "LB" = "X3", "CDTE" = "X4", "UB" = "X5") %>%
+    pivot_longer(cols = c("ITE", "CATE", "LB", "CDTE", "UB"))
+  return(CVaRs.df)
+}
+```
+
+
+Lets do it first for the two extreme cases. 
+```{r}
+
+res = create.results(a.0 = 0, a.1 = 0, b.0 = 2, b.1 = 1, mu.X = 1, sigma.X = 0.01,
+                     sigma.0 = 1, sigma.1 = 1)
+
+
+plot.x = ggplot(data = res, aes(x = corr, y = value, group = name, color = name)) +
+  geom_line(alpha = 0.6, position = position_jitter(width = 0.01, height = 0.01, seed = 1)) +
+  geom_point(position = position_jitter(width = 0.01, height = 0.01, seed = 1)) +
+  theme_bw() +
+  theme(legend.position = "top") +
+  labs(x = expression(rho), color = "", group = "",
+       y = expression(widehat(CVaR)[alpha](delta))) +
+  scale_color_jama() +
+  ggtitle("a")
+plot.x
+ggsave("./Plots/sigma_x_zero.png", plot.x, width = 15, height = 15, units = "cm")
+```
+
+```{r}
+
+res = create.results(a.0 = 0, a.1 = 0, b.0 = 2, b.1 = 1, mu.X = 1, sigma.X = 0.5,
+                     sigma.0 = 0.05, sigma.1 = 0.05)
+
+
+plot.y = ggplot(data = res, aes(x = corr, y = value, group = name, color = name)) +
+  geom_line(alpha = 0.6, position = position_jitter(width = 0.001, height = 0.001, seed = 1)) +
+  geom_point(position = position_jitter(width = 0.001, height = 0.001, seed = 1)) +
+  theme_bw() +
+  theme(legend.position = "top") +
+  labs(x = expression(rho), color = "", group = "",
+       y = expression(widehat(CVaR)[alpha](delta))) +
+  scale_color_jama() +
+  ggtitle("b")
+plot.y
+ggsave("./Plots/sigma_y_zero.png", plot.y, width = 15, height = 15, units = "cm")
+```
+
+```{r}
+plot.comb = ggarrange(plot.x, plot.y, ncol = 2)
+plot.comb
+ggsave("./Plots/plot_combined.png", plot.comb, width = 20, height = 10, units = "cm")
+```
+
