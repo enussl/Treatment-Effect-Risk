@@ -430,7 +430,7 @@ Lets do it first for the two extreme cases.
 ```{r}
 
 res = create.results(a.0 = 0, a.1 = 0, b.0 = 2, b.1 = 1, mu.X = 1, sigma.X = 0.01,
-                     sigma.0 = 1, sigma.1 = 1)
+                     sigma.0 = 1, sigma.1 = 1.5)
 
 
 plot.x = ggplot(data = res, aes(x = corr, y = value, group = name, color = name)) +
@@ -441,7 +441,7 @@ plot.x = ggplot(data = res, aes(x = corr, y = value, group = name, color = name)
   labs(x = expression(rho), color = "", group = "",
        y = expression(widehat(CVaR)[alpha](delta))) +
   scale_color_jama() +
-  ggtitle("a")
+  ggtitle("a)")
 plot.x
 ggsave("./Plots/sigma_x_zero.png", plot.x, width = 15, height = 15, units = "cm")
 ```
@@ -460,7 +460,7 @@ plot.y = ggplot(data = res, aes(x = corr, y = value, group = name, color = name)
   labs(x = expression(rho), color = "", group = "",
        y = expression(widehat(CVaR)[alpha](delta))) +
   scale_color_jama() +
-  ggtitle("b")
+  ggtitle("b)")
 plot.y
 ggsave("./Plots/sigma_y_zero.png", plot.y, width = 15, height = 15, units = "cm")
 ```
@@ -468,6 +468,6 @@ ggsave("./Plots/sigma_y_zero.png", plot.y, width = 15, height = 15, units = "cm"
 ```{r}
 plot.comb = ggarrange(plot.x, plot.y, ncol = 2)
 plot.comb
-ggsave("./Plots/plot_combined.png", plot.comb, width = 20, height = 10, units = "cm")
+ggsave("./Plots/plot_combined.pdf", plot.comb, width = 20, height = 10, units = "cm")
 ```
 
