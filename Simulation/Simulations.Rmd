@@ -419,8 +419,8 @@ create.results = function(a.0,a.1,b.0,b.1,mu.X,sigma.X,sigma.0,sigma.1){
   ), dim = c(30,5))
   CVaRs.df = data.frame(CVaRs) %>%
     mutate(corr = rhos) %>%
-    rename("ITE" = "X1", "CATE" = "X2", "LB" = "X3", "CDTE" = "X4", "UB" = "X5") %>%
-    pivot_longer(cols = c("ITE", "CATE", "LB", "CDTE", "UB"))
+    rename("Truth" = "X1", "Kallus" = "X2", "LB" = "X3", "CTE" = "X4", "UB" = "X5") %>%
+    pivot_longer(cols = c("Truth", "Kallus", "LB", "CTE", "UB"))
   return(CVaRs.df)
 }
 ```
@@ -440,8 +440,7 @@ plot.x = ggplot(data = res, aes(x = corr, y = value, group = name, color = name)
   theme(legend.position = "top") +
   labs(x = expression(rho), color = "", group = "",
        y = expression(widehat(CVaR)[alpha](delta))) +
-  scale_color_jama() +
-  ggtitle("a)")
+  scale_color_jama()
 plot.x
 ggsave("./Plots/sigma_x_zero.png", plot.x, width = 15, height = 15, units = "cm")
 ```
@@ -459,8 +458,7 @@ plot.y = ggplot(data = res, aes(x = corr, y = value, group = name, color = name)
   theme(legend.position = "top") +
   labs(x = expression(rho), color = "", group = "",
        y = expression(widehat(CVaR)[alpha](delta))) +
-  scale_color_jama() +
-  ggtitle("b)")
+  scale_color_jama()
 plot.y
 ggsave("./Plots/sigma_y_zero.png", plot.y, width = 15, height = 15, units = "cm")
 ```
